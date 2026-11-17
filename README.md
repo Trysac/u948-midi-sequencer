@@ -1,47 +1,34 @@
 # midi-sequencer
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/Trysac/u948-midi-sequencer/actions/workflows/ci.yml/badge.svg)](https://github.com/Trysac/u948-midi-sequencer/actions/workflows/ci.yml)
-
-Read and write Standard MIDI Files byte for byte, preserving running status and unknown chunks, and merge tracks into a tempo-mapped event timeline in microseconds
-
-## Problem
-
-Describe in two or three sentences the concrete problem this utility solves, who hits it, and what
-they do today without it. Replace this paragraph when the first real feature lands.
-
-## Install
-
-A C++20 library built with CMake. Until it is published to a vcpkg registry, add this repository
-at a release tag as a subdirectory (or through `FetchContent`) and link its target:
-
-```cmake
-add_subdirectory(u948-midi-sequencer)
-target_link_libraries(app PRIVATE trysac::midi_sequencer)
-```
-
-Requires a C++20 compiler and CMake 3.29 or newer. No dependencies outside the C++ standard
-library.
+Music tools that edit MIDI files often rewrite them differently than they were read (dropping running status, converting note-off to note-on with velocity 0, or dropping unknown chunks), which breaks diff-based workflows and round-trip tests. Timing is also prone to errors during tempo changes. This library provides a zero-dependency C++20 implementation to parse Standard MIDI Files into an event model that preserves every encoding detail, writes them back byte-identical, and merges tracks into a tempo-mapped timeline in microseconds.
 
 ## Usage
 
 ```cpp
-#include <trysac/midi_sequencer/text.hpp>
+#include "trysac/midi_sequencer/midi.hpp"
 
-// normalize trims surrounding whitespace and lower-cases the text.
-auto name = trysac::midi_sequencer::normalize("  Hello World ");  // "hello world"
+namespace midi = trysac::midi_sequencer;
 
-// Blank input is rejected explicitly instead of returning an empty string.
-trysac::midi_sequencer::normalize("   ");  // throws BlankInputError ("input is blank")
+midi::MidiFile file{.format = 0, .division = 480};
+std::vector<midi::Event> track;
+midi::append_absolute(track, midi::make_note(0, 60, 100, 0, 480));
+file.tracks.push_back(std::move(track));
+const auto bytes = midi::write_midi(file);
+const auto timeline = midi::sequence(midi::read_midi(bytes));
 ```
 
-## Documentation
+## API Summary
 
-- [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/decisions/)
-- [Testing](docs/TESTING.md) and [security](docs/SECURITY.md)
-- [Project record](docs/PROJECT.md) and [stack](docs/STACK.md)
-- [Changelog](CHANGELOG.md) and [contributing guide](CONTRIBUTING.md)
+- `read_midi(bytes, limits)`: Parses binary data into `MidiFile`, enforcing `ReadLimits` (max_input_bytes 16,777,216, max_tracks 65,535, max_events_per_track 1,000,000, max_event_bytes 1,048,576).
+- `write_midi(file)`: Serializes `MidiFile` back to byte-identical binary format.
+- `sequence(file)`: Computes a chronological timeline of events in microseconds, handling PPQ or SMPTE timing and tempo changes.
+- `encode_vlq` / `decode_vlq`: Codecs for standard 4-byte MIDI variable-length quantities.
+- `make_note`: Helper to generate note-on/note-off pairs.
+- `append_absolute`: Helper to build tracks from absolute-timed events.
+- `MidiError`: Exception class with codes: `not_midi`, `truncated`, `invalid_vlq`, `missing_status`, `invalid_format`, `input_too_large`, `too_many_events`, `invalid_event`.
 
-## License
+## Why not existing libraries?
 
-[MIT](LICENSE) (c) 2026 Miguel Gomez
+Many MIDI libraries do not support lossless round-tripping of raw MIDI stream details like running status and unknown chunks, and few provide exact microsecond timing with typed error handling and configurable resource limits.
+
+See [docs/SECURITY.md](docs/SECURITY.md) for security notes.

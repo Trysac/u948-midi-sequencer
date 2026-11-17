@@ -6,7 +6,6 @@
 #include <string>
 #include <string_view>
 
-/// @brief The public API of this library.
 namespace trysac::midi_sequencer {
 
 /// @brief The input is empty or holds only whitespace; `what()` is `input is blank`.
