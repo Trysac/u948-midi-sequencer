@@ -9,4 +9,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added Standard MIDI File 1.0 reader, writer, VLQ codec, note builder, and microsecond timeline sequencer.
 - Initial project structure from the factory utility template.
